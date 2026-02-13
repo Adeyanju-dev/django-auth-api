@@ -1,3 +1,4 @@
+from urllib import request
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -14,6 +15,7 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.conf import settings
 
 
 @extend_schema(
@@ -32,9 +34,12 @@ class RegisterView(generics.CreateAPIView):
         token = token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-        verification_link = f"http://127.0.0.1:8000/api/auth/verify/{uid}/{token}/"
+        # Build base URL from the current request (works on Render)
+        base_url =request.build_absolute_uri("/")[:-1]  # e.g. https://yourapp.onrender.com
+        verification_link = f"{base_url}/api/auth/verify/{uid}/{token}/"
 
         print("Verification Link:", verification_link)
+
 
 @extend_schema(
     description="Verify user email address using the verification link sent during registration.",
@@ -131,7 +136,9 @@ class ForgotPasswordView(APIView):
             token = token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-            reset_link = f"http://127.0.0.1:8000/api/auth/reset-password/{uid}/{token}/"
+            base_url = request.build_absolute_uri("/")[:-1]
+            reset_link = f"{base_url}/api/auth/reset-password/{uid}/{token}/"
+
 
             print("Password Reset Link:", reset_link)
 
