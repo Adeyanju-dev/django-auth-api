@@ -35,7 +35,7 @@ class RegisterView(generics.CreateAPIView):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
 
         # Build base URL from the current request (works on Render)
-        base_url =request.build_absolute_uri("/")[:-1]  # e.g. https://yourapp.onrender.com
+        base_url = self.request.build_absolute_uri("/")[:-1]  # e.g. https://yourapp.onrender.com
         verification_link = f"{base_url}/api/auth/verify/{uid}/{token}/"
 
         print("Verification Link:", verification_link)
