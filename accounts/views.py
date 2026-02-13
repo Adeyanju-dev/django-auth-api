@@ -3,7 +3,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import RegisterSerializer, LoginSerializer
+from .serializers import RegisterSerializer, LoginSerializer, EmailSerializer, NewPasswordSerializer
 from .models import User
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -114,20 +114,15 @@ class ProtectedView(generics.GenericAPIView):
 @extend_schema(
     description="Request a password reset link by providing the registered email address.",
     tags=["Authentication"],
+    request=EmailSerializer,
 )
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get("email")
-
-        if not email:
-            return Response({
-                "success": False,
-                "message": "Email is required",
-                "data": None
-            }, status=400
-            )
+        serializer = EmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
 
         user = User.objects.filter(email=email).first()
 
@@ -136,10 +131,8 @@ class ForgotPasswordView(APIView):
             token = token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-            base_url = request.build_absolute_uri("/")[:-1]
+            base_url = self.request.build_absolute_uri("/")[:-1]
             reset_link = f"{base_url}/api/auth/reset-password/{uid}/{token}/"
-
-
             print("Password Reset Link:", reset_link)
 
         # Always return same response
@@ -155,12 +148,15 @@ class ForgotPasswordView(APIView):
 @extend_schema(
     description="Reset password using the link sent to email. Provide new password in the request body.",
     tags=["Authentication"],
+    request=NewPasswordSerializer,
 )
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, uidb64, token):
-        new_password = request.data.get("password")
+        serializer = NewPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        new_password = serializer.validated_data["password"]
 
         if not new_password:
             return Response({"error": "Password is required"}, status=400)

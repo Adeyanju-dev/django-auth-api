@@ -65,3 +65,9 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Email is not verified")
 
         return user
+    
+class EmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class NewPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(min_length=8, write_only=True)
