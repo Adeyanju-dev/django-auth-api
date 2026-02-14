@@ -1,4 +1,3 @@
-from urllib import request
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,6 +15,7 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from .email_service import send_html_email
 
 
 @extend_schema(
@@ -35,10 +35,19 @@ class RegisterView(generics.CreateAPIView):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
 
         # Build base URL from the current request (works on Render)
-        base_url = self.request.build_absolute_uri("/")[:-1]  # e.g. https://yourapp.onrender.com
+        base_url = (settings.PUBLIC_API_BASE_URL or self.request.build_absolute_uri("/")[:-1]).rstrip('/')
         verification_link = f"{base_url}/api/auth/verify/{uid}/{token}/"
 
-        print("Verification Link:", verification_link)
+        subject = "Verify your email"
+        text = f"Verify your email using this link: {verification_link}"
+        html = f"""
+            <p>Welcome!</p>
+            <p>Please verify your email by clicking the link below:</p>
+            <p><a href="{verification_link}">Verify Email</a></p>
+            <p>If you didn't create an account, ignore this email.</p>
+        """
+
+        send_html_email(subject, user.email, text, html)
 
 
 @extend_schema(
@@ -131,9 +140,18 @@ class ForgotPasswordView(APIView):
             token = token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-            base_url = self.request.build_absolute_uri("/")[:-1]
+            base_url = (settings.PUBLIC_API_BASE_URL or self.request.build_absolute_uri("/")[:-1]).rstrip('/')
             reset_link = f"{base_url}/api/auth/reset-password/{uid}/{token}/"
-            print("Password Reset Link:", reset_link)
+            subject = "Reset your password"
+            text = f"Reset your password using this link: {reset_link}"
+            html = f"""
+                <p>You requested a password reset.</p>
+                <p>Click the link below to set a new password:</p>
+                <p><a href="{reset_link}">Reset Password</a></p>
+                <p>If you didn't request this, ignore this email.</p>
+            """
+
+            send_html_email(subject, user.email, text, html)
 
         # Always return same response
         return Response(
