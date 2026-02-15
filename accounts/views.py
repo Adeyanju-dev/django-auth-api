@@ -176,6 +176,57 @@ class ForgotPasswordView(APIView):
             },
             status=200
         )
+    
+@extend_schema(
+    description="Resend verification email if user exists and is not verified.",
+    tags=["Authentication"],
+    request=EmailSerializer,
+)
+@method_decorator(ratelimit(key='ip', rate='3/m', block=True), name='post')
+class ResendVerificationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = EmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        user = User.objects.filter(email=email).first()
+
+        # Always return same response (prevents email enumeration)
+        response_payload = {
+            "success": True,
+            "message": "If this email exists and is not verified, a verification link has been sent.",
+            "data": None
+        }
+
+        if not user or user.is_verified:
+            return Response(response_payload, status=200)
+
+        try:
+            token_generator = PasswordResetTokenGenerator()
+            token = token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+            base_url = (settings.PUBLIC_API_BASE_URL or request.build_absolute_uri("/")[:-1]).rstrip("/")
+            verification_link = f"{base_url}/api/auth/verify/{uid}/{token}/"
+
+            subject = "Verify your email"
+            text = f"Verify your email using this link: {verification_link}"
+            html = f"""
+                <p>Hello {user.full_name},</p>
+                <p>Please verify your email by clicking the link below:</p>
+                <p><a href="{verification_link}">Verify Email</a></p>
+                <p>If you didn’t create an account, ignore this email.</p>
+            """
+
+            send_html_email(subject, user.email, text, html)
+
+        except Exception as e:
+            # Don't fail the endpoint; just log
+            logger.exception("Resend verification email failed: %s", e)
+
+        return Response(response_payload, status=200)
 
 @extend_schema(
     description="Reset password using the link sent to email. Provide new password in the request body.",
