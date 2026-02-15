@@ -16,6 +16,9 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from .email_service import send_html_email
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(
@@ -30,25 +33,36 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save()
 
-        token_generator = PasswordResetTokenGenerator()
-        token = token_generator.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        try:
+            token_generator = PasswordResetTokenGenerator()
+            token = token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-        # Build base URL from the current request (works on Render)
-        base_url = (settings.PUBLIC_API_BASE_URL or self.request.build_absolute_uri("/")[:-1]).rstrip('/')
-        verification_link = f"{base_url}/api/auth/verify/{uid}/{token}/"
+            # Build base URL from the current request (works on Render)
+            base_url = (settings.PUBLIC_API_BASE_URL or self.request.build_absolute_uri("/")[:-1]).rstrip('/')
+            verification_link = f"{base_url}/api/auth/verify/{uid}/{token}/"
 
-        subject = "Verify your email"
-        text = f"Verify your email using this link: {verification_link}"
-        html = f"""
-            <p>Welcome!</p>
-            <p>Please verify your email by clicking the link below:</p>
-            <p><a href="{verification_link}">Verify Email</a></p>
-            <p>If you didn't create an account, ignore this email.</p>
-        """
+            subject = "Verify your email"
+            text = f"Verify your email using this link: {verification_link}"
+            html = f"""
+                <p>Welcome!</p>
+                <p>Please verify your email by clicking the link below:</p>
+                <p><a href="{verification_link}">Verify Email</a></p>
+                <p>If you didn't create an account, ignore this email.</p>
+            """
 
-        send_html_email(subject, user.email, text, html)
+            send_html_email(subject, user.email, text, html)
+        except Exception as e:
+            logger.exception("Post-register action failed (email/link): %s", e)
 
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        return Response({
+            "success": True,
+            "message": "Account created. Check your email for verification.",
+            "data": response.data
+        }, status=201)
+    
 
 @extend_schema(
     description="Verify user email address using the verification link sent during registration.",
