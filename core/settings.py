@@ -185,3 +185,10 @@ EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=20, cast=int)
 
 # Public base URL for links (recommended for production)
 PUBLIC_API_BASE_URL = config("PUBLIC_API_BASE_URL", default="")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+}
