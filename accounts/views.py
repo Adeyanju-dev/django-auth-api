@@ -146,6 +146,7 @@ class ForgotPasswordView(APIView):
         serializer = EmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
+        serializer_class = EmailSerializer
 
         user = User.objects.filter(email=email).first()
 
@@ -240,6 +241,7 @@ class ResetPasswordView(APIView):
         serializer = NewPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         new_password = serializer.validated_data["password"]
+        serializer_class = NewPasswordSerializer
 
         if not new_password:
             return Response({"error": "Password is required"}, status=400)
